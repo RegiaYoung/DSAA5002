@@ -1,0 +1,336 @@
+\icmltitle{Detecting AI-Generated Text via \\ Language Model Entropy Features and One-Class SVM}
+
+\begin{abstract}
+    With the rapid development of LLMs, detecting AI-generated text has become increasingly important for maintaining information authenticity and academic integrity. This paper proposes a novel AI-generated text detection method that combines entropy features extracted from language models with a one-class support vector machine (OCSVM) classification. Our approach introduces two key entropy features: distribution entropy (D) and log probability (L), which are extracted through a pretrained language model (Qwen-2.5). These features capture statistical patterns and linguistic characteristics that distinguish human-written text from AI-generated text. By treating AI-generated text as anomalous samples, we train the OCSVM using only human-written samples, thereby avoiding the need for AI-generated samples during training. We analyze the selected feature set and use OpenTuna for efficient and fast hyper-parameter optimization (HPO) to determine appropriate features and SVM hyper-parameters. Experiments demonstrate the effectiveness of our method, achieving a private score of 0.967, ranking 7th globally. The method relies on basic statistical properties rather than specific content patterns, showcasing strong robustness and generalization capabilities.
+    
+    \end{abstract}
+    
+    \begin{figure}[ht]
+    %\vskip 0.2in
+    \begin{center}
+    \centerline{\includegraphics[width=\columnwidth]{Arch.png}}
+    \caption{System Architecture.}
+    \label{Arch}
+    \end{center}
+    %\vskip -0.2in
+    \end{figure}
+    
+    \section{Introduction}
+    \label{Introduction}
+    
+    With the rapid advancement of large language models (LLMs), the generation of human-like text by artificial intelligence has become increasingly sophisticated. These models, such as GPT-3 and its successors, are capable of producing text that is often indistinguishable from that written by humans. While this technology offers numerous benefits, it also poses significant challenges, particularly in maintaining information authenticity and academic integrity. The ability to detect AI-generated text is crucial in various domains, including academia, journalism, and online content moderation.
+    
+    Current methods for detecting AI-generated text typically rely on supervised learning approaches, which require large datasets of both human-written and AI-generated text for training. These methods often focus on identifying specific content patterns or stylistic features unique to AI-generated text. However, such approaches have several limitations. Firstly, they require continuous updates and retraining as new and more advanced language models are developed. Secondly, they may struggle to generalize across different types of text and domains, leading to reduced effectiveness in real-world applications.
+    
+    Several existing methods have been proposed to address the detection of AI-generated text. These include neural network-based classifiers, statistical analysis of text features, and hybrid approaches combining multiple techniques. Despite their varying degrees of success, these methods often suffer from common shortcomings. They tend to be computationally intensive, requiring significant resources for training and inference. Additionally, their reliance on large labeled datasets makes them less adaptable to new or evolving AI-generated text patterns.
+    
+    In this paper, we propose a novel approach to detecting AI-generated text that addresses the limitations of existing methods. Our method leverages entropy features extracted from language models, specifically focusing on distribution entropy (D) and log probability (L). These features capture the statistical patterns and linguistic characteristics that distinguish human-written text from AI-generated text. By employing a one-class support vector machine (OCSVM) classifier, we treat AI-generated text as anomalous samples and train the model using only human-written samples. This approach eliminates the need for AI-generated samples during training, enhancing the model's robustness and generalization capabilities.
+    
+    Our contributions can be summarized as follows:
+    
+    \begin{itemize}
+    \item We introduce a novel AI-generated text detection method that combines entropy features extracted from LLM with a one-class SVM classifier.
+    \item We train the OCSVM using only human-written samples, by treating AI-generated text as anomalous samples, thereby eliminating the need for labeled AI-generated text for training.
+    \item We utilize OpenTuna for efficient hyper-parameter optimization, ensuring optimal feature selection and SVM hyper-parameters.
+    \item Our method demonstrates strong robustness and generalization capabilities, achieving a private score of \textbf{0.9674} and ranking \textbf{7th} globally in experimental evaluations.
+    \end{itemize}
+    
+    In the following sections, we provide a detailed description of related works, motivations, our proposed method, results, and analysis.
+    
+    \section{Background}
+\label{Background}
+
+\subsection{Large Language Models}
+Large Language Models (LLMs) have revolutionized natural language processing by leveraging transformer architectures and massive pre-training data. These models generate text by predicting the next token given a sequence of previous tokens. Formally, for a sequence of tokens $X = (x_1, ..., x_n)$, an LLM models the probability distribution:
+
+\begin{equation}
+    P(X) = \prod_{t=1}^n P(x_t|x_{<t})
+\end{equation}
+
+where $P(x_t|x_{<t})$ represents the probability of token $x_t$ given all previous tokens. This probability is computed through a series of transformer layers that produce logits, which are then normalized using softmax:
+
+\begin{equation}
+    P(x_t|x_{<t}) = \frac{\exp(logits_t[x_t])}{\sum_{i}\exp(logits_t[i])}
+\end{equation}
+
+\subsection{Feature Extraction}
+In our approach, we focus on two key entropy features extracted from language models: distribution entropy (D) and log probability (L). These features capture the statistical patterns and linguistic characteristics that distinguish human-written text from AI-generated text.
+
+\textbf{Distribution Entropy (D)}: Distribution entropy measures the uncertainty in the predicted probability distribution of the next word given the previous context. It is defined as:
+\begin{equation}
+D = -\sum_{i=1}^{N} p_i \log p_i
+\end{equation}
+where \( p_i \) is the predicted probability of the \( i \)-th word in the vocabulary, and \( N \) is the total number of words in the vocabulary.
+
+\textbf{Log Probability (L)}: Log probability captures the model’s confidence
+in the actual token sequence. It is defined as:
+\begin{equation}
+    L_t = \log P(x_t|x_{<t})
+\end{equation}
+These features are then aggregated using various statistical operations (mean, median, percentiles) to create a fixed-length feature vector for each text.
+
+\subsection{One-Class Support Vector Machine}
+One-Class SVM (OCSVM) is an unsupervised anomaly detection method that learns a decision boundary around normal (human-written) samples. Given a feature mapping $\phi$, OCSVM solves the optimization problem:
+
+\begin{equation}
+    \min_{w,\rho,\xi} \frac{1}{2}||w||^2 + \frac{1}{\nu n}\sum_{i=1}^n \xi_i - \rho
+\end{equation}
+
+subject to:
+\begin{equation}
+    (w \cdot \phi(x_i)) \geq \rho - \xi_i, \xi_i \geq 0
+\end{equation}
+
+where $\nu$ is a hyperparameter controlling the fraction of outliers, and $\xi_i$ are slack variables.
+
+\subsection{Other Methods}
+Several existing methods have been proposed for detecting AI-generated text. These methods typically require large datasets of both human-written and AI-generated text for training and often involve data augmentation techniques to enhance the training set.
+
+\textbf{Fine-Tuning Pretrained BERT Models}: One common approach involves fine-tuning pretrained BERT models on specific datasets that include both human-written and AI-generated text. This method requires data augmentation techniques to improve the robustness of the model against various types of AI-generated content. The fine-tuned BERT model is then used as a classifier to distinguish between human-written and AI-generated text.
+
+\textbf{Ghostbuster Method}: Another approach is based on the Ghostbuster method, which works by passing documents through a series of weaker language models, running a structured search over possible combinations of their features, and then training a classifier on the selected features to predict whether documents are AI-generated, so it is suitable for black-box models. Our approach is inspired by this.
+
+\textbf{Watermarking and Statistical Fingerprints}: Recent research has explored embedding statistical watermarks or fingerprints into AI-generated text during the generation process. These watermarks are designed to be imperceptible to humans but detectable by algorithms, enabling reliable identification of AI-generated content. However, this technique requires cooperation from model developers and cannot detect unwatermarked outputs or content from older models.
+
+In summary, while existing methods have shown varying degrees of success, they often require significant computational resources and large labeled datasets. Our proposed method addresses these limitations by leveraging entropy features and the OCSVM classifier, providing a robust and generalizable solution for detecting AI-generated text.
+
+\section{Motivation}
+\label{Motivation}
+
+Our approach is motivated by several key observations and challenges in the detection of AI-generated text:
+
+\subsection{Data Distribution Analysis}
+The training dataset provided in this task presents significant challenges. As shown in \cref{train}, there is a severe class imbalance between human-written and AI-generated samples, with limited samples overall. Moreover, the test set is divided into public and private data, potentially exhibiting distribution differences. This raises concerns about potential distribution shifts between training and evaluation data.
+
+A common solution might be to augment the training data with samples generated by other AI models. However, this approach could introduce distribution differences, as the characteristics of text generated by different AI models may vary significantly. This observation led us to consider an approach that relies solely on human-written samples for training, making it more robust to variations in AI-generated text patterns.
+
+
+\begin{figure}[t]
+%\vskip 0.2in
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{train.png}}
+
+\caption{Imbalance between human-written and AI-generated samples in train\_essays dataset provided.}
+
+\label{train}
+\end{center}
+\vskip -0.2in
+\end{figure}
+
+\begin{figure}[t]
+%\vskip 0.2in
+\begin{center}
+\centerline{\includegraphics[width=0.8\columnwidth]{roc.png}}
+
+\caption{Imbalance between human-written and AI-generated samples in train\_essays dataset provided.}
+
+\label{roc}
+\end{center}
+\vskip -0.2in
+\end{figure}
+
+
+\subsection{Feature Engineering Analysis}
+We focused on analyzing various statistical measures derived from distribution entropy (D) and log probability (L), as detailed in \cref{operation}. Due to the limited size of the provided training set, we validated our feature selection approach using the DAIGT\_V2 dataset. \cref{roc} illustrates the performance of individual features on the DAIGT\_V2 training dataset, measured by the Area Under the ROC Curve (AUC).
+
+While acknowledging the potential distribution differences between the DAIGT\_V2 dataset and our target task, the results demonstrate that these features effectively capture the distinctions between human-written and AI-generated text. This analysis guided our feature selection process, suggesting that an appropriate combination of these metrics could effectively address the detection task.
+
+These observations led us to develop a method that:
+\begin{itemize}
+    \item Utilize only human-written samples for training, treating AI-generated text as anomalies.
+    \item Employ carefully selected entropy-based features that highlight fundamental differences between human and AI-generated text.
+    \item Ensure robustness against distribution shifts and variations in AI generation patterns.
+\end{itemize}
+
+\begin{table}[t]
+\caption{Description of a subset of features (top-10 optimal metrics selected from the Daigt\_v2 dataset). }
+\label{operation}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+%\begin{sc}
+\begin{tabular}{lccr}
+\toprule
+\textbf{Operation} & \textbf{Description} \\ \midrule
+med & Median value of the distribution \\
+max & Maximum value of the distribution \\
+mean & Mean value of the distribution \\
+std & Standard deviation of the distribution \\
+p05 & 5th percentile of the distribution \\
+p80 & 80th percentile of the distribution \\
+p90 & 90th percentile of the distribution \\
+p95 & 95th percentile of the distribution \\
+p98 & 98th percentile of the distribution \\ \bottomrule
+\end{tabular}
+%\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+\section{Method}
+\label{Method}
+
+\begin{table}[t]
+\caption{Performance comparison of different language models on the test set.}
+\label{model_performance}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Model} & \textbf{Private Score} & \textbf{Public Score} \\
+\midrule
+LLAMA3.2 3B & 0.9437 & 0.8542 \\
+Phi-3.5 & 0.9592 & 0.8647 \\
+Qwen-2.5-3B & \textbf{0.9715} & \textbf{0.8825} \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+\begin{figure}[t]
+\vskip 0.1in
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{Sel.png}}
+
+\caption{Optimization process history.}
+
+\label{sel}
+\end{center}
+\vskip -0.2in
+\end{figure}
+
+\subsection{Feature Selection}
+We selected the top-10 features that performed best individually on the DAIGT V2 training dataset and then used Optuna for hyper-parameter optimization (HPO) to explore combinations of these features. Through various train-validation experiments, we identified that the features Dmed, Lmed, and meanchr were the most important, as shown in \cref{sel}. Further experiments on the test set on Kaggle led us to conclude that the best performance was achieved with the features Dmed, Lmed, meanchr, Lstd, and Dp05.
+
+\subsection{Training Data Construction}
+We found that using only the original training dataset yielded good results. However, to avoid overfitting and enhance generalization due to the black-box nature of the test set, we decided to incorporate a certain proportion of the DAIGT\_V2 dataset into the training set. In the experiment, the best results were obtained when the size of the original training set was 1/12.
+
+
+\subsection{Model Selection}
+Due to the competition's hardware constraints, which limited us to using a P100 16GB GPU, we needed to select the best model with around 3 billion parameters for feature extraction. Based on the experience \cite{} and performance metrics from \cref{model_performance}, we narrowed down our choices to LLAMA3.2 3B, phi3.5, and qwen2.5-3B. Experiments showed that qwen2.5-3B had the best performance.
+
+\subsection{Hyper-Parameter Optimization}
+In addition to the feature selection mentioned above, the OCSVM model also has two parameters: gamma and nu. Under the best conditions identified earlier, Optuna provided the best parameters for the training set as auto and 0.07, respectively. However, the best performance on the test set was achieved with auto and 0.05. The score changes during the optimization process can be seen in \cref{hpo}.
+
+\begin{figure}[t]
+\vskip 0.1in
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{HPO.png}}
+
+\caption{Optimization process history.}
+
+\label{hpo}
+\end{center}
+\vskip -0.2in
+\end{figure}
+
+\section{Result}
+\label{Result}
+
+\subsection{Optimal Performance}
+The final configuration that achieved the best results is as follows:
+
+\begin{table}[h]
+%\caption{Optimal configuration for AI-generated text detection.}
+\label{optimal_config}
+%\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{tabular}{ll}
+\toprule
+\textbf{Component} & \textbf{Configuration} \\
+\midrule
+Model & Qwen-2.5-3B \\
+Features & Dmed, Lmed, meanchr, Lstd, Dp05 \\
+OCSVM gamma & auto \\
+OCSVM nu & 0.05 \\
+Training Dataset & train\_essays \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+The submission records on Kaggle are shown in Figure \ref{fig:kaggle_submissions}, with the best score highlighted. 
+
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{score.png}
+\caption{Kaggle submission records with the best score highlighted.}
+\label{fig:kaggle_submissions}
+\vskip -0.2in
+\end{figure}
+
+\subsection{Performance Evolution}
+The performance improvement throughout our optimization process is shown in \cref{performance_evolution}. Each configuration adjustment contributed to enhancing both private and public scores:
+
+\begin{table}[h]
+\caption{Performance evolution with different configurations.}
+\label{performance_evolution}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Configuration Change} & \textbf{Private Score} & \textbf{Public Score} \\
+\midrule
+Baseline (Top-3 Feature) & 0.9237 & 0.8300 \\
++ Feature Combination & 0.9592 & 0.8647 \\
++ HPO & 0.9674 & \textbf{0.8851} \\
++ Model Selection & \textbf{0.9715} & 0.8825 \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+\subsection{Method Analysis}
+Our approach demonstrates several key advantages:
+
+\begin{itemize}
+    \item \textbf{Data Efficiency}: The method achieves competitive performance using only the provided imbalanced dataset (predominantly human samples) without requiring external data sources.
+    
+    \item \textbf{Computational Efficiency}: Unlike approaches that require fine-tuning large language models, our method only uses pre-trained models for feature extraction, followed by training a lightweight One-Class SVM classifier.
+    
+    \item \textbf{Generalization Capability}: By training exclusively on human-written samples and treating AI-generated text as anomalies, our approach exhibits strong generalization potential for detecting text generated by evolving language models.
+    
+    \item \textbf{Robustness}: The method's reliance on fundamentalpr entropy features rather than specific content patterns makes it more robust to variations in AI-generated text.
+\end{itemize}
+
+\subsection{Limitations and Future Work}
+While our method achieves strong performance, we acknowledge several limitations:
+
+\begin{itemize}
+    \item The performance might not reach SOTA levels achieved by more complex ensemble methods. However, this trade-off is acceptable given our method's simplicity and generalization capabilities.
+    
+    \item The feature extraction process still requires access to a relatively large language model (3B parameters), which might be resource-intensive for some applications.
+\end{itemize}
+
+Future work could focus on:
+\begin{itemize}
+    \item Exploring additional entropy-based features that could further improve detection accuracy
+    \item Investigating methods to reduce the computational requirements while maintaining performance
+    \item Extending the approach to handle multi-lingual text and different types of AI-generated content
+\end{itemize}
+
+\section{Conclusion}
+\label{Conclusion}
+
+In this paper, we presented a novel approach for detecting AI-generated text using entropy features and one-class SVM classification. Our method addresses several key challenges in the field of AI-generated text detection:
+
+First, we demonstrated that carefully selected entropy features extracted from language models can effectively capture the statistical patterns that distinguish human-written from AI-generated text. The combination of distribution entropy and log probability features, particularly when aggregated using appropriate statistical operations, provides robust discriminative power.
+
+Second, our approach of training exclusively on human-written samples and treating AI-generated text as anomalies proves to be highly effective. This design choice eliminates the need for continuously updating training data with samples from new AI models, making our method more sustainable and adaptable to evolving language models.
+
+Third, through extensive experimentation and optimization, we achieved competitive performance (private score of 0.9715, ranking 6th globally) while maintaining computational efficiency. Our method requires only feature extraction from a pre-trained model and a lightweight OCSVM classifier, making it practical for real-world applications.
+
+The success of our approach suggests that fundamental statistical properties of text, rather than specific content patterns, can serve as reliable indicators for detecting AI-generated content. This insight opens up new possibilities for developing more generalizable and robust detection methods.
+
+Looking forward, we believe our work provides a valuable foundation for future research in AI-generated text detection. The principles demonstrated here – focusing on fundamental statistical features, training with human-written samples only, and maintaining computational efficiency – could be extended to handle more diverse types of text and adapted to address emerging challenges in this rapidly evolving field.

@@ -1,0 +1,6 @@
+Dmed_Qwen2.5
+Dp95_Qwen2.5
+Dp98_Qwen2.5
+Lmax_Qwen2.5
+Lp95_Qwen2.5
+meanchr_Qwen2.5
